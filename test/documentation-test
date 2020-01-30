@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+SEMVER_HOME="$(cd "$(dirname "$(command -v "$0")")/.." >/dev/null; pwd -P)"
+
+SEMVER=$SEMVER_HOME/src/semver
+README=$SEMVER_HOME/README.md
+
+set -e -u
+
+function list_tests() {
+  grep '^    \$ semver' "$README" | cut -d '$' -f2-
+}
+
+function expected_result_for_test() {
+  local test=$1
+  grep -A1 "$test\$" "$README" | tail -1 | sed -e 's/^ *//'
+}
+
+# TODO: how to assert that certain input versions will fail the version-check?
+#   for example the command `semver get major 01.2.3`
+#   must fail, as the given version is not valid.
+
+list_tests |
+  while read -r unit_test; do
+    expected_result=$(expected_result_for_test "$unit_test")
+    # make test invoke ../src/semver
+    actual_result=$(${unit_test//semver/$SEMVER})
+
+    if [[ "$actual_result" != "$expected_result" ]]; then
+        echo "Test failed: $unit_test"
+        echo "Expected " "$expected_result" " but got " "$actual_result"
+        exit 1
+    fi
+  done
