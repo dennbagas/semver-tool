@@ -2,7 +2,7 @@ FROM alpine
 
 LABEL maintainer="Bagas Alfiandhi <dennbagas@gmail.com>" semver-tool="https://github.com/fsaintjacques/semver-tool"
 
-RUN apk update && apk upgrade && apk add --no-cache bash curl curl-dev jq make
+RUN apk update && apk upgrade && apk add --no-cache bash curl curl-dev jq make git
 
 COPY src src
 COPY test test
