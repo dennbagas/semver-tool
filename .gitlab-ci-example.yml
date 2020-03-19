@@ -1,0 +1,41 @@
+# use base image
+image: dennbagas/win-semver
+
+# create environment level by commit ref
+variables:
+  ENV_LEVEL: '(if [[ "$$CI_COMMIT_REF_NAME" == "development" ]]; then echo dev; elif [[ "$$CI_COMMIT_REF_NAME" == "master" ]]; then echo prod; fi);'
+
+# define stages
+stages:
+  - calculate
+  - push-tag
+
+Calculate Version:
+  stage: calculate
+  only:
+    refs:
+      - master
+  script:
+    # evaluate the build level
+    - BUILD_LEVEL=$(eval $ENV_LEVEL)
+    # bump version
+    - NEW_VERSION=$(win bump --build-level $BUILD_LEVEL)
+    - echo $NEW_VERSION > version_new
+  artifacts:
+    paths:
+      - version_new
+
+Push back tag:
+  stage: push-tag
+  only:
+    refs:
+      - master
+  script:
+    # evaluate the build level
+    - BUILD_LEVEL=$(eval $ENV_LEVEL)
+    # get the latest tag with the build level
+    - OLD_VERSION=$(win get-latest-tag $BUILD_LEVEL)
+    # get new version from artifacts
+    - NEW_VERSION=$(cat ./version_new)
+    # auto delete old tag. if the commit have \[keep-old-tag\] string, it will keep the old tag
+    - if [[ "$CI_COMMIT_MESSAGE" =~ \[keep-old-tag\] ]]; then win push-tag $NEW_VERSION-$BUILD_LEVEL; else win push-tag $NEW_VERSION-$BUILD_LEVEL --delete-old-tag $OLD_VERSION; fi
