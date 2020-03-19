@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+
+PROG=win
+PROG_VERSION="1.0.0"
+GL_API_TAGS=$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/tags
+
+USAGE="\
+Usage:
+  $PROG bump <version>
+  $PROG get-latest-tag <search tag value>
+  $PROG analyze-commit
+  $PROG push-tag <tag> (--delete-old-tag <old tag>)
+  $PROG --help
+  $PROG --version
+
+Commands:
+    <bump>            Trigger bump version automatically (patch|major|minor) analyzing commit message
+
+    <get-latest-tag>  Get latest tag from gitlab
+
+    <analyze-commit>  Detect a commit message that trigger bumping level.
+                      A commit message must contain the following string:
+                        -- \"[patch]\" to trigger PATCH number bump
+                        -- \"[minor]\" to trigger MINOR number bump
+                        -- \"[major]\" to trigger MAJOR number bump
+
+    <push-tag>        Push tag back to gitlab
+
+Options:
+  -v, --version          Print the version of this tool.
+  -h, --help             Print this help message."
+ 
+function error {
+  echo -e "$1" >&2
+  exit 1
+}
+
+function usage-help {
+  error "$USAGE"
+}
+
+function usage-version {
+  echo -e "${PROG}: $PROG_VERSION"
+  exit 0
+}
+
+function get-commit {
+    echo $CI_COMMIT_MESSAGE
+    exit 0
+}
+
+function analyze-commit {
+    local bump_level;
+
+    local patch="\[patch\]"
+    local minor="\[minor\]"
+    local major="\[major\]"
+
+    case "$(get-commit)" in
+        *$patch*) bump_level="patch";;
+        *$minor*) bump_level="minor";;
+        *$major*) bump_level="major";;
+        *)  usage-help;;
+    esac
+
+    echo $bump_level
+    exit 0
+}
+
+function get-latest-tag {
+  local tag_list; local latest_tag;
+
+  if [ -z $GL_TOKEN ]; then
+    error "Variable GL_TOKEN is not set or empty!"
+  fi
+
+  case $# in
+    0) tag_list=$(curl --location --request GET "$GL_API_TAGS" --header "Authorization:"" Bearer $GL_TOKEN");;
+    1) tag_list=$(curl --location --request GET "$GL_API_TAGS?search=$1" --header "Authorization:"" Bearer $GL_TOKEN");;
+    *) usage-help;;
+  esac
+
+  latest_tag=$(echo "$tag_list" | jq -r '.[0] | .name');test -z "$latest_tag" && echo "no previous version tag found" && exit 1
+  
+  echo $latest_tag
+  exit 0
+}
+
+function push-tag {
+  local new_tag; local delete_old_tag;
+
+  if [ -z $GL_TOKEN ]; then
+    error "Variable GL_TOKEN is not set or empty!"
+  fi
+
+  case $# in
+    1) new_tag=$(curl --location --request POST "$GL_API_TAGS?tag_name=$1&ref=$CI_COMMIT_REF_NAME" --header "Authorization:"" Bearer $GL_TOKEN");;
+    3) case $2 in
+        --delete-old-tag)
+          new_tag=$(curl --location --request POST "$GL_API_TAGS?tag_name=$1&ref=$CI_COMMIT_REF_NAME" --header "Authorization:"" Bearer $GL_TOKEN");
+          delete_old_tag=$(curl --location --request DELETE "$GL_API_TAGS/$3" --header "Authorization:"" Bearer $GL_TOKEN");;
+        *) usage-help;;
+       esac ;;
+    *) usage-help;;
+  esac
+
+  echo $new_tag
+  exit 0
+}
+
+function bump-version {
+    local bump_level; local next_version; local version;
+
+    bump_level=$(analyze-commit)
+
+    case $# in
+      0) 
+        last_version=$(get-latest-tag);
+        next_version=$(semver bump $bump_level $last_version)
+        ;;
+      2) case $1 in
+          --build-level)
+            last_version=$(get-latest-tag $2);
+            next_version=$(semver bump $bump_level $last_version)
+            ;;
+          *) usage-help;;
+          esac ;;
+      *) usage-help;;
+    esac
+
+    echo $next_version
+    exit 0
+}
+
+case $# in
+  0) echo "Unknown command: $*"; usage-help;;
+esac
+
+case $1 in
+  --help|-h) echo -e "$USAGE"; exit 0;;
+  --version|-v) usage-version ;;
+  analyze-commit) analyze-commit;;
+  bump) shift; bump-version "$@";;
+  get-latest-tag) shift; get-latest-tag "$@";;
+  push-tag) shift; push-tag "$@";;
+esac

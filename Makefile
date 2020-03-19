@@ -15,5 +15,6 @@ lint:
 
 install:
 	install src/semver ${DESTDIR}${PREFIX}/bin
+	install src/win ${DESTDIR}${PREFIX}/bin
 
 .PHONY: doc-test unit-test install lint
