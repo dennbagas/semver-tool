@@ -6,7 +6,7 @@ GL_API_TAGS=$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/tags
 
 USAGE="\
 Usage:
-  $PROG bump <version>
+  $PROG bump (--build-level <dev|prod|anything>)
   $PROG get-latest-tag <search tag value>
   $PROG analyze-commit
   $PROG push-tag <tag> (--delete-old-tag <old tag>)
