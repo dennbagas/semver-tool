@@ -56,7 +56,7 @@ Options:
 -h, --help Print this help message."
 ```
 
-### Because this libs use semver-tool, you can use semver-tool api:
+### Because this libs use [semver-tool](https://github.com/fsaintjacques/semver-tool), you can use semver-tool api:
 
 ```
 semver bump (major|minor|patch|release|prerel <prerel>|build <build>) <version>
